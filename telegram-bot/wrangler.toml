@@ -1,0 +1,20 @@
+name = "personal-finance-telegram-bot"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+DEFAULT_CURRENCY = "VND"
+
+# Service binding: routes requests to the backend Worker-to-Worker inside
+# Cloudflare's network, bypassing the "no workers.dev-to-workers.dev fetch"
+# restriction (Cloudflare error 1042) you'd hit calling BACKEND_URL directly.
+[[services]]
+binding = "BACKEND"
+service = "personal-finance-backend"
+
+# Secrets — do NOT put real values here. Set via `wrangler secret put <NAME>`,
+# and locally via a .dev.vars file:
+#   BOT_TOKEN=...              (from @BotFather)
+#   BACKEND_API_SECRET=...     (must match backend's API_SECRET)
+#   WEBHOOK_SECRET=...         (random string, verifies Telegram webhook calls)

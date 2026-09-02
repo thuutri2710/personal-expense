@@ -1,0 +1,78 @@
+import type {
+  AnalyticsSummary,
+  AnalyticsTrendPoint,
+  Category,
+  CreateCategoryInput,
+  CreateExpenseInput,
+  Expense,
+  ParseExpenseResult,
+  UpdateExpenseInput,
+} from "@/types";
+
+const API_URL = import.meta.env.VITE_API_URL;
+const API_SECRET = import.meta.env.VITE_API_SECRET;
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${API_SECRET}`,
+      ...init?.headers,
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Request failed (${res.status}): ${body}`);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  expenses: {
+    list: (params?: { from?: string; to?: string; categoryId?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.from) query.set("from", params.from);
+      if (params?.to) query.set("to", params.to);
+      if (params?.categoryId) query.set("categoryId", String(params.categoryId));
+      const qs = query.toString();
+      return request<Expense[]>(`/expenses${qs ? `?${qs}` : ""}`);
+    },
+    create: (input: CreateExpenseInput) =>
+      request<Expense>("/expenses", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    update: (id: number, input: UpdateExpenseInput) =>
+      request<Expense>(`/expenses/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    delete: (id: number) =>
+      request<void>(`/expenses/${id}`, { method: "DELETE" }),
+    parse: (text: string) =>
+      request<ParseExpenseResult>("/expenses/parse", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      }),
+  },
+  categories: {
+    list: () => request<Category[]>("/categories"),
+    create: (input: CreateCategoryInput) =>
+      request<Category>("/categories", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    delete: (id: number) =>
+      request<void>(`/categories/${id}`, { method: "DELETE" }),
+  },
+  analytics: {
+    summary: (month?: string) =>
+      request<AnalyticsSummary>(`/analytics/summary${month ? `?month=${month}` : ""}`),
+    trends: (months = 6) =>
+      request<AnalyticsTrendPoint[]>(`/analytics/trends?months=${months}`),
+  },
+};

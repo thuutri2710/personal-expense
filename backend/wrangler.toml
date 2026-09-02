@@ -1,0 +1,24 @@
+name = "personal-finance-backend"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "personal-finance"
+database_id = "f0ca9eee-e1ec-4688-9486-81b3a768936a"
+
+[ai]
+binding = "AI"
+
+[vars]
+DEFAULT_CURRENCY = "VND"
+# Comma-separated list of allowed CORS origins (frontend dev + prod URLs)
+CORS_ORIGINS = "http://localhost:5173,https://personal-finance-frontend.pages.dev"
+# Workers AI model used to categorize expenses (falls back to keyword matching
+# on any failure/timeout). See https://developers.cloudflare.com/workers-ai/models/
+AI_MODEL = "@cf/meta/llama-3.2-3b-instruct"
+
+# Secrets (do NOT put real values here — set via `wrangler secret put API_SECRET`
+# and locally via a .dev.vars file, e.g.:
+#   API_SECRET=your-shared-secret
