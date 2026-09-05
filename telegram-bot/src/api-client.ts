@@ -1,4 +1,11 @@
-import type { AnalyticsSummary, Category, Env, Expense, ParseExpenseResult } from "./types";
+import type {
+  AnalyticsSummary,
+  Category,
+  CreditExpense,
+  Env,
+  Expense,
+  ParseExpenseResult,
+} from "./types";
 
 export class ApiClient {
   constructor(private env: Env) {}
@@ -51,6 +58,19 @@ export class ApiClient {
     return this.request("/expenses/parse", {
       method: "POST",
       body: JSON.stringify({ text }),
+    });
+  }
+
+  createCreditExpense(input: {
+    totalAmount: number;
+    months: number;
+    startMonth: string;
+    description: string;
+    categoryId?: number | null;
+  }): Promise<CreditExpense> {
+    return this.request("/credit-expenses", {
+      method: "POST",
+      body: JSON.stringify({ ...input, source: "telegram" }),
     });
   }
 

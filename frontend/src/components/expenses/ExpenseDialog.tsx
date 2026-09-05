@@ -27,7 +27,7 @@ import {
   useParseExpenseText,
   useUpdateExpense,
 } from "@/hooks/useExpenses";
-import { currentMonthIso, formatCurrency, todayIso } from "@/lib/format";
+import { currentMonthIso, formatCurrency, formatExchangeRate, formatOriginalAmount, todayIso } from "@/lib/format";
 import type { Category, CreditExpenseMissingField, Expense } from "@/types";
 
 type ExpenseDialogProps = {
@@ -82,6 +82,9 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
   const [creditTotalAmount, setCreditTotalAmount] = useState("");
   const [creditMonths, setCreditMonths] = useState("");
   const [creditStartMonth, setCreditStartMonth] = useState(currentMonthIso());
+  const [originalCurrency, setOriginalCurrency] = useState<string | null>(null);
+  const [originalAmount, setOriginalAmount] = useState<number | null>(null);
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
 
   const { data: categories = [] } = useCategories();
   const categorySelectItems = [
@@ -107,6 +110,9 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
       setCreditTotalAmount("");
       setCreditMonths("");
       setCreditStartMonth(currentMonthIso());
+      setOriginalCurrency(null);
+      setOriginalAmount(null);
+      setExchangeRate(null);
     }
     setOpen(nextOpen);
   }
@@ -114,7 +120,13 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
   async function handleParse() {
     if (!quickText.trim()) return;
 
-    const result = await parseExpenseText.mutateAsync(quickText.trim());
+    // The backend splits comma-separated text into one transaction per segment. This
+    // dialog only edits one expense at a time, so take the first and tell the user
+    // about the rest rather than silently dropping them.
+    const results = await parseExpenseText.mutateAsync(quickText.trim());
+    const [result, ...rest] = results;
+    if (!result) return;
+
     if (!result.ok) {
       if (result.reason === "missing_credit_info") {
         const missingLabels = result.missing.map((field) => MISSING_FIELD_LABELS[field]);
@@ -130,23 +142,29 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
     setDescription(result.description);
     setCategoryId(result.categoryId ? String(result.categoryId) : UNCATEGORIZED);
 
+    const extraNote =
+      rest.length > 0 ? ` (found ${rest.length} more — add ${rest.length === 1 ? "it" : "them"} separately)` : "";
+
     if (result.kind === "credit") {
       setCreditTotalAmount(String(result.totalAmount));
       setCreditMonths(String(result.months));
       setCreditStartMonth(result.startMonth);
       setActiveTab("credit");
       toast.success(
-        result.categoryName
+        (result.categoryName
           ? `Parsed as a ${result.months}-month credit expense — ${result.categoryName}${result.categorySource === "ai" ? " (AI)" : ""} — review below`
-          : `Parsed as a ${result.months}-month credit expense — review below`,
+          : `Parsed as a ${result.months}-month credit expense — review below`) + extraNote,
       );
     } else {
       setAmount(String(result.amount));
+      setOriginalCurrency(result.originalCurrency);
+      setOriginalAmount(result.originalAmount);
+      setExchangeRate(result.exchangeRate);
       setActiveTab("manual");
       toast.success(
-        result.categoryName
+        (result.categoryName
           ? `Parsed as ${result.categoryName}${result.categorySource === "ai" ? " (AI)" : ""} — review below`
-          : "Parsed — pick a category below",
+          : "Parsed — pick a category below") + extraNote,
       );
     }
   }
@@ -216,7 +234,13 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
         await updateExpense.mutateAsync({ id: expense.id, input: payload });
         toast.success("Expense updated");
       } else {
-        await createExpense.mutateAsync({ ...payload, source: "web" });
+        await createExpense.mutateAsync({
+          ...payload,
+          source: "web",
+          originalCurrency,
+          originalAmount,
+          exchangeRate,
+        });
         toast.success("Expense added");
       }
       setOpen(false);
@@ -293,8 +317,21 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
                     step="1"
                     placeholder="0"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      // Editing the amount by hand invalidates the currency/rate that
+                      // came from a parsed quick-add result.
+                      setOriginalCurrency(null);
+                      setOriginalAmount(null);
+                      setExchangeRate(null);
+                    }}
                   />
+                  {originalCurrency && originalAmount !== null && (
+                    <p className="text-xs text-muted-foreground">
+                      Converted from {formatOriginalAmount(originalAmount, originalCurrency)}
+                      {exchangeRate !== null && ` @ ${formatExchangeRate(exchangeRate)}`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-2">

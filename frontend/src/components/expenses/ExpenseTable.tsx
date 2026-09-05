@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { ExpenseDialog } from "@/components/expenses/ExpenseDialog";
 import { DeleteExpenseButton } from "@/components/expenses/DeleteExpenseButton";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatExchangeRate, formatOriginalAmount } from "@/lib/format";
 import type { Category, CreditExpense, Expense } from "@/types";
 
 type ExpenseTableProps = {
@@ -39,13 +39,23 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
           <TableHead>Date</TableHead>
           <TableHead>Description</TableHead>
           <TableHead>Category</TableHead>
-          <TableHead className="text-right">Amount</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Currency</TableHead>
+          <TableHead className="text-right">Original amount</TableHead>
+          <TableHead className="text-right">Amount (VND)</TableHead>
+          <TableHead className="text-right">Rate</TableHead>
           <TableHead className="w-20" />
         </TableRow>
       </TableHeader>
       <TableBody>
         {expenses.map((expense) => {
           const category = expense.categoryId ? categoryById.get(expense.categoryId) : null;
+          const isCredit = expense.creditExpenseId !== null;
+          const creditExpense = expense.creditExpenseId
+            ? creditExpenseById.get(expense.creditExpenseId)
+            : null;
+          const currency = expense.originalCurrency ?? expense.currency;
+
           return (
             <TableRow key={expense.id}>
               <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -53,28 +63,39 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
               </TableCell>
               <TableCell className="font-medium">{expense.description}</TableCell>
               <TableCell>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {category ? (
-                    <Badge variant="secondary" className="font-normal">
-                      {category.icon ? `${category.icon} ` : ""}
-                      {category.name}
-                    </Badge>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
-                  {expense.creditExpenseId && (
-                    <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
-                      <Repeat className="h-3 w-3" />
-                      {expense.installmentIndex}
-                      {creditExpenseById.get(expense.creditExpenseId)
-                        ? `/${creditExpenseById.get(expense.creditExpenseId)!.months}`
-                        : ""}
-                    </Badge>
-                  )}
-                </div>
+                {category ? (
+                  <Badge variant="secondary" className="font-normal">
+                    {category.icon ? `${category.icon} ` : ""}
+                    {category.name}
+                  </Badge>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {isCredit ? (
+                  <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
+                    <Repeat className="h-3 w-3" />
+                    Credit
+                    {creditExpense ? ` ${expense.installmentIndex}/${creditExpense.months}` : ""}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="font-normal">
+                    Cash
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell className="text-muted-foreground">{currency}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {expense.originalAmount !== null && expense.originalCurrency
+                  ? formatOriginalAmount(expense.originalAmount, expense.originalCurrency)
+                  : formatCurrency(expense.amount, expense.currency)}
               </TableCell>
               <TableCell className="text-right font-medium tabular-nums">
                 {formatCurrency(expense.amount, expense.currency)}
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground tabular-nums">
+                {expense.exchangeRate !== null ? formatExchangeRate(expense.exchangeRate) : "—"}
               </TableCell>
               <TableCell>
                 <div className="flex justify-end gap-1">

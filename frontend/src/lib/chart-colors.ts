@@ -17,3 +17,15 @@ export function colorForCategory(categoryId: number | null): string {
   const index = (categoryId - 1) % CHART_COLOR_VARS.length;
   return CHART_COLOR_VARS[index];
 }
+
+// Fixed regardless of which appears first in a given month, so "cash" and "credit"
+// always render in the same color across the whole chart.
+const TYPE_COLORS: Record<string, string> = {
+  cash: "var(--chart-1)",
+  credit: "var(--chart-4)",
+};
+
+/** Stable color per payment-type breakdown key ("cash" | "credit"). */
+export function colorForType(key: string): string {
+  return TYPE_COLORS[key] ?? "var(--muted-foreground)";
+}

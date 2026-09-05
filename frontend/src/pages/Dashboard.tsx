@@ -2,7 +2,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SummaryCards } from "@/components/charts/SummaryCards";
 import { CategoryBreakdownChart } from "@/components/charts/CategoryBreakdownChart";
-import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
+import { SpendingBarChart } from "@/components/charts/SpendingBarChart";
 import { ExpenseTable } from "@/components/expenses/ExpenseTable";
 import { useAnalyticsSummary, useAnalyticsTrends } from "@/hooks/useAnalytics";
 import { useCategories } from "@/hooks/useCategories";
@@ -11,7 +11,7 @@ import { useExpenses } from "@/hooks/useExpenses";
 
 export function Dashboard() {
   const { data: summary } = useAnalyticsSummary();
-  const { data: trends } = useAnalyticsTrends(6);
+  const { data: trends } = useAnalyticsTrends({ period: "monthly", limit: 6 });
   const { data: categories = [] } = useCategories();
   const { data: creditExpenses = [] } = useCreditExpenses();
   const { data: expenses = [] } = useExpenses();
@@ -66,7 +66,7 @@ export function Dashboard() {
               <CardTitle className="text-base">Monthly trend</CardTitle>
             </CardHeader>
             <CardContent>
-              <MonthlyTrendChart data={trends ?? []} currency={summary?.currency ?? "VND"} />
+              <SpendingBarChart data={trends ?? []} currency={summary?.currency ?? "VND"} period="monthly" />
             </CardContent>
           </Card>
         </div>

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const categories = sqliteTable("categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -24,6 +24,23 @@ export const rawMessages = sqliteTable("raw_messages", {
     .default(sql`(current_timestamp)`),
 });
 
+export const creditExpenses = sqliteTable("credit_expenses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  description: text("description").notNull(),
+  categoryId: integer("category_id").references(() => categories.id, {
+    onDelete: "set null",
+  }),
+  // total amount owed across the whole installment plan, same minor-unit convention as expenses.amount
+  totalAmount: integer("total_amount").notNull(),
+  currency: text("currency").notNull(),
+  months: integer("months").notNull(),
+  startMonth: text("start_month").notNull(), // YYYY-MM, first installment's month
+  source: text("source", { enum: ["telegram", "web"] }).notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+});
+
 export const expenses = sqliteTable("expenses", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   // stored as integer minor units (e.g. whole VND, or cents for currencies with decimals)
@@ -38,4 +55,32 @@ export const expenses = sqliteTable("expenses", {
   createdAt: text("created_at")
     .notNull()
     .default(sql`(current_timestamp)`),
+  // set when this row is one installment of a credit expense plan, rather than a standalone expense
+  creditExpenseId: integer("credit_expense_id").references(() => creditExpenses.id, {
+    onDelete: "cascade",
+  }),
+  installmentIndex: integer("installment_index"), // 1-based position within the plan's months
+  // Set only when `amount`/`currency` above were converted from a non-default currency the
+  // user typed (e.g. "$20 lunch"). Null when the expense was already in the default currency.
+  originalCurrency: text("original_currency"),
+  originalAmount: integer("original_amount"), // minor units of originalCurrency, e.g. USD cents
+  exchangeRate: real("exchange_rate"), // 1 unit of originalCurrency = exchangeRate VND, at occurredAt
 });
+
+// Cache of resolved historical FX rates, keyed by currency + date, so repeated
+// conversions for the same currency on the same day don't re-hit the rate API.
+export const fxRates = sqliteTable(
+  "fx_rates",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    currency: text("currency").notNull(), // ISO 4217 code, e.g. "USD"
+    date: text("date").notNull(), // ISO date the rate applies to, e.g. 2026-09-01
+    rate: real("rate").notNull(), // 1 unit of currency = rate VND
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => ({
+    currencyDateUnique: uniqueIndex("fx_rates_currency_date_unique").on(table.currency, table.date),
+  }),
+);

@@ -194,3 +194,25 @@ cd telegram-bot && pnpm deploy
 
 Database schema changes need a new migration (`pnpm exec drizzle-kit generate`
 in `backend/`) applied with `npm run db:migrate:remote` before redeploying.
+
+## Automatic deploys (CI)
+
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml) redeploys each
+service on every push to `main`, but only the ones whose folder actually
+changed (a frontend-only commit won't redeploy the backend or bot). The
+backend job also re-runs `wrangler d1 migrations apply --remote` before
+deploying, so new migrations land automatically.
+
+One-time setup — add these as **repo secrets** (Settings → Secrets and
+variables → Actions → New repository secret):
+
+| Secret | Value |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token that can edit Workers, Pages, and D1 (dashboard → My Profile → API Tokens → "Edit Cloudflare Workers" template covers all three) |
+| `CLOUDFLARE_ACCOUNT_ID` | Found on the right sidebar of any page in the Cloudflare dashboard |
+| `VITE_API_URL` | Same value as the manual frontend build above |
+| `VITE_API_SECRET` | Same shared secret as the manual frontend build above |
+
+Wrangler secrets (`API_SECRET`, `BACKEND_API_SECRET`, `BOT_TOKEN`,
+`WEBHOOK_SECRET`) are already stored on Cloudflare from the manual setup
+above — CI doesn't need to touch them.

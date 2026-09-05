@@ -1,5 +1,7 @@
 import type {
+  AnalyticsPeriod,
   AnalyticsSummary,
+  AnalyticsTrendBreakdown,
   AnalyticsTrendPoint,
   Category,
   CreateCategoryInput,
@@ -56,8 +58,10 @@ export const api = {
       }),
     delete: (id: number) =>
       request<void>(`/expenses/${id}`, { method: "DELETE" }),
+    // The backend splits comma-separated text into one transaction per segment,
+    // so this always returns an array, even for a single-transaction input.
     parse: (text: string) =>
-      request<ParseExpenseResult>("/expenses/parse", {
+      request<ParseExpenseResult[]>("/expenses/parse", {
         method: "POST",
         body: JSON.stringify({ text }),
       }),
@@ -85,7 +89,13 @@ export const api = {
   analytics: {
     summary: (month?: string) =>
       request<AnalyticsSummary>(`/analytics/summary${month ? `?month=${month}` : ""}`),
-    trends: (months = 6) =>
-      request<AnalyticsTrendPoint[]>(`/analytics/trends?months=${months}`),
+    trends: (params?: { period?: AnalyticsPeriod; limit?: number; breakdown?: AnalyticsTrendBreakdown }) => {
+      const query = new URLSearchParams();
+      if (params?.period) query.set("period", params.period);
+      if (params?.limit) query.set("limit", String(params.limit));
+      if (params?.breakdown) query.set("breakdown", params.breakdown);
+      const qs = query.toString();
+      return request<AnalyticsTrendPoint[]>(`/analytics/trends${qs ? `?${qs}` : ""}`);
+    },
   },
 };

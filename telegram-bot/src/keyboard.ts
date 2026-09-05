@@ -1,6 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { formatAmount } from "./format";
-import type { Category, Expense } from "./types";
+import type { Category, CreditExpense, CreditExpenseMissingField, Expense } from "./types";
 
 export function buildCorrectionKeyboard(expenseId: number, categories: Category[]): InlineKeyboard {
   const kb = new InlineKeyboard();
@@ -19,6 +19,32 @@ export function confirmationText(expense: Expense, categoryName: string | null):
     categoryName ?? "Uncategorized",
     "",
     "Not quite right? Use the buttons below to fix it.",
+  ].join("\n");
+}
+
+const MISSING_FIELD_LABELS: Record<CreditExpenseMissingField, string> = {
+  amount: "total amount",
+  months: "number of months",
+  startMonth: "start month",
+};
+
+export function creditMissingInfoText(missing: CreditExpenseMissingField[]): string {
+  const labels = missing.map((field) => MISSING_FIELD_LABELS[field]);
+  return [
+    `This looks like a credit/installment expense, but I'm missing: ${labels.join(", ")}.`,
+    'Try something like "installment laptop 12tr for 12 months from March 2026".',
+  ].join("\n");
+}
+
+export function creditConfirmationText(
+  creditExpense: CreditExpense,
+  categoryName: string | null,
+): string {
+  const monthly = Math.round(creditExpense.totalAmount / creditExpense.months);
+  return [
+    `✅ Credit expense: ${formatAmount(creditExpense.totalAmount, creditExpense.currency)} — ${creditExpense.description}`,
+    `${creditExpense.months} months starting ${creditExpense.startMonth} (${formatAmount(monthly, creditExpense.currency)}/mo)`,
+    categoryName ?? "Uncategorized",
   ].join("\n");
 }
 

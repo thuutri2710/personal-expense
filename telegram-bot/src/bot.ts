@@ -7,6 +7,8 @@ import {
   amountPromptText,
   buildCorrectionKeyboard,
   confirmationText,
+  creditConfirmationText,
+  creditMissingInfoText,
   extractAmountCorrectionTarget,
 } from "./keyboard";
 import { startCommand } from "./commands/start";
@@ -92,8 +94,28 @@ export function createBot(env: Env) {
     if (!parsed.ok) {
       await logMessage(ctx.backend, { chatId, rawText, parseStatus: "failed" });
       await ctx.reply(
-        "I couldn't find an amount in that message. Try something like \"50k coffee\".",
+        parsed.reason === "missing_credit_info"
+          ? creditMissingInfoText(parsed.missing)
+          : "I couldn't find an amount in that message. Try something like \"50k coffee\".",
       );
+      return;
+    }
+
+    if (parsed.kind === "credit") {
+      const [creditExpense, categories] = await Promise.all([
+        ctx.backend.createCreditExpense({
+          totalAmount: parsed.totalAmount,
+          months: parsed.months,
+          startMonth: parsed.startMonth,
+          description: parsed.description,
+          categoryId: parsed.categoryId,
+        }),
+        ctx.backend.listCategories(),
+      ]);
+      const category = categories.find((c) => c.id === creditExpense.categoryId) ?? null;
+
+      await logMessage(ctx.backend, { chatId, rawText, parseStatus: "parsed" });
+      await ctx.reply(creditConfirmationText(creditExpense, category?.name ?? null));
       return;
     }
 
