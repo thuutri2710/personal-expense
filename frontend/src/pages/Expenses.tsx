@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { ExpenseTable } from "@/components/expenses/ExpenseTable";
 import { useCategories } from "@/hooks/useCategories";
+import { useCreditExpenses } from "@/hooks/useCreditExpenses";
 import { useExpenses } from "@/hooks/useExpenses";
 import { formatCurrency } from "@/lib/format";
 
@@ -23,6 +24,7 @@ export function Expenses() {
   const [categoryId, setCategoryId] = useState(ALL_CATEGORIES);
 
   const { data: categories = [] } = useCategories();
+  const { data: creditExpenses = [] } = useCreditExpenses();
   const { data: expenses = [], isLoading } = useExpenses({
     from: from || undefined,
     to: to || undefined,
@@ -79,7 +81,7 @@ export function Expenses() {
 
         <Card>
           <CardContent className="px-0">
-            <ExpenseTable expenses={expenses} categories={categories} />
+            <ExpenseTable expenses={expenses} categories={categories} creditExpenses={creditExpenses} />
           </CardContent>
         </Card>
       </div>

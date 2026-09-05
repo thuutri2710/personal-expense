@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { CreateExpenseInput, UpdateExpenseInput } from "@/types";
 
-export function useExpenses(params?: { from?: string; to?: string; categoryId?: number }) {
+export function useExpenses(params?: {
+  from?: string;
+  to?: string;
+  categoryId?: number;
+  limit?: number;
+}) {
   return useQuery({
     queryKey: ["expenses", params ?? {}],
     queryFn: () => api.expenses.list(params),

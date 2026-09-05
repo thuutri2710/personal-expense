@@ -6,12 +6,14 @@ import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { ExpenseTable } from "@/components/expenses/ExpenseTable";
 import { useAnalyticsSummary, useAnalyticsTrends } from "@/hooks/useAnalytics";
 import { useCategories } from "@/hooks/useCategories";
+import { useCreditExpenses } from "@/hooks/useCreditExpenses";
 import { useExpenses } from "@/hooks/useExpenses";
 
 export function Dashboard() {
   const { data: summary } = useAnalyticsSummary();
   const { data: trends } = useAnalyticsTrends(6);
   const { data: categories = [] } = useCategories();
+  const { data: creditExpenses = [] } = useCreditExpenses();
   const { data: expenses = [] } = useExpenses();
 
   const topCategory = summary?.byCategory.length
@@ -74,7 +76,7 @@ export function Dashboard() {
             <CardTitle className="text-base">Recent expenses</CardTitle>
           </CardHeader>
           <CardContent className="px-0">
-            <ExpenseTable expenses={recentExpenses} categories={categories} />
+            <ExpenseTable expenses={recentExpenses} categories={categories} creditExpenses={creditExpenses} />
           </CardContent>
         </Card>
       </div>

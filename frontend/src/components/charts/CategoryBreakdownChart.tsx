@@ -33,7 +33,7 @@ export function CategoryBreakdownChart({
   if (data.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-        No expenses yet this month.
+        No expenses yet.
       </div>
     );
   }

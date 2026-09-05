@@ -14,6 +14,8 @@ export type Expense = {
   occurredAt: string;
   source: "telegram" | "web";
   createdAt: string;
+  creditExpenseId: number | null;
+  installmentIndex: number | null;
 };
 
 export type CreateExpenseInput = {
@@ -32,11 +34,48 @@ export type CreateCategoryInput = {
   icon?: string | null;
 };
 
+export type CreditExpense = {
+  id: number;
+  description: string;
+  categoryId: number | null;
+  totalAmount: number;
+  currency: string;
+  months: number;
+  startMonth: string; // YYYY-MM
+  source: "telegram" | "web";
+  createdAt: string;
+};
+
+export type CreateCreditExpenseInput = {
+  description: string;
+  categoryId?: number | null;
+  totalAmount: number;
+  currency?: string;
+  months: number;
+  startMonth: string; // YYYY-MM
+  source: "telegram" | "web";
+};
+
+export type CreditExpenseMissingField = "amount" | "months" | "startMonth";
+
 export type ParseExpenseResult =
   | { ok: false; reason: "no_amount" }
+  | { ok: false; reason: "missing_credit_info"; missing: CreditExpenseMissingField[] }
   | {
       ok: true;
+      kind: "direct";
       amount: number;
+      description: string;
+      categoryId: number | null;
+      categoryName: string | null;
+      categorySource: "ai" | "keyword" | "none";
+    }
+  | {
+      ok: true;
+      kind: "credit";
+      totalAmount: number;
+      months: number;
+      startMonth: string; // YYYY-MM
       description: string;
       categoryId: number | null;
       categoryName: string | null;

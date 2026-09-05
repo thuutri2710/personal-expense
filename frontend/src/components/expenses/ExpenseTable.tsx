@@ -1,4 +1,4 @@
-import { Pencil } from "lucide-react";
+import { Pencil, Repeat } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,15 +12,17 @@ import {
 import { ExpenseDialog } from "@/components/expenses/ExpenseDialog";
 import { DeleteExpenseButton } from "@/components/expenses/DeleteExpenseButton";
 import { formatCurrency, formatDate } from "@/lib/format";
-import type { Category, Expense } from "@/types";
+import type { Category, CreditExpense, Expense } from "@/types";
 
 type ExpenseTableProps = {
   expenses: Expense[];
   categories: Category[];
+  creditExpenses?: CreditExpense[];
 };
 
-export function ExpenseTable({ expenses, categories }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, categories, creditExpenses = [] }: ExpenseTableProps) {
   const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const creditExpenseById = new Map(creditExpenses.map((ce) => [ce.id, ce]));
 
   if (expenses.length === 0) {
     return (
@@ -51,14 +53,25 @@ export function ExpenseTable({ expenses, categories }: ExpenseTableProps) {
               </TableCell>
               <TableCell className="font-medium">{expense.description}</TableCell>
               <TableCell>
-                {category ? (
-                  <Badge variant="secondary" className="font-normal">
-                    {category.icon ? `${category.icon} ` : ""}
-                    {category.name}
-                  </Badge>
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {category ? (
+                    <Badge variant="secondary" className="font-normal">
+                      {category.icon ? `${category.icon} ` : ""}
+                      {category.name}
+                    </Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                  {expense.creditExpenseId && (
+                    <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
+                      <Repeat className="h-3 w-3" />
+                      {expense.installmentIndex}
+                      {creditExpenseById.get(expense.creditExpenseId)
+                        ? `/${creditExpenseById.get(expense.creditExpenseId)!.months}`
+                        : ""}
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-right font-medium tabular-nums">
                 {formatCurrency(expense.amount, expense.currency)}

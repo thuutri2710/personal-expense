@@ -3,7 +3,9 @@ import type {
   AnalyticsTrendPoint,
   Category,
   CreateCategoryInput,
+  CreateCreditExpenseInput,
   CreateExpenseInput,
+  CreditExpense,
   Expense,
   ParseExpenseResult,
   UpdateExpenseInput,
@@ -33,11 +35,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   expenses: {
-    list: (params?: { from?: string; to?: string; categoryId?: number }) => {
+    list: (params?: { from?: string; to?: string; categoryId?: number; limit?: number }) => {
       const query = new URLSearchParams();
       if (params?.from) query.set("from", params.from);
       if (params?.to) query.set("to", params.to);
       if (params?.categoryId) query.set("categoryId", String(params.categoryId));
+      if (params?.limit) query.set("limit", String(params.limit));
       const qs = query.toString();
       return request<Expense[]>(`/expenses${qs ? `?${qs}` : ""}`);
     },
@@ -68,6 +71,16 @@ export const api = {
       }),
     delete: (id: number) =>
       request<void>(`/categories/${id}`, { method: "DELETE" }),
+  },
+  creditExpenses: {
+    list: () => request<CreditExpense[]>("/credit-expenses"),
+    create: (input: CreateCreditExpenseInput) =>
+      request<CreditExpense>("/credit-expenses", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    delete: (id: number) =>
+      request<void>(`/credit-expenses/${id}`, { method: "DELETE" }),
   },
   analytics: {
     summary: (month?: string) =>

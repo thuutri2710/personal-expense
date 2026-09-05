@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Dashboard } from "@/pages/Dashboard";
 import { Expenses } from "@/pages/Expenses";
+import { History } from "@/pages/History";
 import { Analytics } from "@/pages/Analytics";
 import { Settings } from "@/pages/Settings";
 
@@ -14,6 +15,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/expenses" element={<Expenses />} />
+          <Route path="/history" element={<History />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

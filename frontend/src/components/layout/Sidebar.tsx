@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet } from "lucide-react";
+import { LayoutDashboard, Receipt, CalendarRange, BarChart3, Settings, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/expenses", label: "Expenses", icon: Receipt, end: false },
+  { to: "/history", label: "History", icon: CalendarRange, end: false },
   { to: "/analytics", label: "Analytics", icon: BarChart3, end: false },
   { to: "/settings", label: "Settings", icon: Settings, end: false },
 ];
