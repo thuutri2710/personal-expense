@@ -22,6 +22,11 @@ AI_MODEL = "@cf/meta/llama-3.2-3b-instruct"
 # used as `${FX_API_BASE_URL}@<date>/v1/currencies/<currency>.json`. Swappable if this
 # CDN ever goes away; falls back to a hardcoded rate table on any lookup failure.
 FX_API_BASE_URL = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api"
+# Day of the month your card statement closes. A credit/installment charge dated after
+# this day doesn't land on this month's statement — it rolls to next month's. Used to
+# anchor generated installment/subscription dates to the statement they'll actually
+# appear on, e.g. a purchase on the 19th (with a close day of 4) is billed next month.
+STATEMENT_CLOSE_DAY = "4"
 
 # Secrets (do NOT put real values here — set via `wrangler secret put API_SECRET`
 # and locally via a .dev.vars file, e.g.:

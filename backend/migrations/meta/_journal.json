@@ -43,6 +43,13 @@
       "when": 1789430400000,
       "tag": "0005_credit_expenses_billing_type",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789516800000,
+      "tag": "0006_credit_expenses_cycles",
+      "breakpoints": true
     }
   ]
 }

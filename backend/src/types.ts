@@ -6,6 +6,7 @@ export type Env = {
   CORS_ORIGINS: string;
   AI_MODEL: string;
   FX_API_BASE_URL: string;
+  STATEMENT_CLOSE_DAY: string;
 };
 
 export type Category = {
@@ -26,7 +27,7 @@ export type Expense = {
   source: "telegram" | "web";
   createdAt: string;
   creditExpenseId: number | null;
-  installmentIndex: number | null;
+  currentCycle: number | null; // 1-based position within the plan's totalCycle
   // Set only when `amount`/`currency` were converted from a currency the user actually
   // typed (e.g. "$20 lunch"); null when the expense was already in the default currency.
   originalCurrency: string | null;
@@ -57,20 +58,21 @@ export type CreditExpense = {
   description: string;
   categoryId: number | null;
   billingType: BillingType;
-  // "installment": total price financed, split evenly across `months`.
-  // "subscription": the amount charged every period — NOT divided by months.
+  // "installment": total price financed, split evenly across `totalCycle`.
+  // "subscription": the amount charged every period — NOT divided by totalCycle.
   totalAmount: number;
   currency: string;
-  months: number | null; // required for "installment"; null = ongoing "subscription"
-  startDate: string; // ISO date, e.g. 2026-07-10 — first charge's exact date
-  endDate: string | null; // ISO date; derived from months when known, null = ongoing
+  totalCycle: number | null; // required for "installment"; null = ongoing "subscription"
+  // ISO date, e.g. 2026-07-10 — the real date of purchase. Never shifted for billing —
+  // each generated expense's own occurredAt is anchored to the statement it lands on.
+  transactionDate: string;
   source: "telegram" | "web";
   createdAt: string;
   // Set only when totalAmount/currency were converted from a currency the user actually
   // quoted (e.g. a USD subscription price); null when already in the default currency.
   originalCurrency: string | null;
   originalAmount: number | null; // minor units of originalCurrency
-  exchangeRate: number | null; // 1 unit of originalCurrency = exchangeRate VND, at startDate
+  exchangeRate: number | null; // 1 unit of originalCurrency = exchangeRate VND, at transactionDate
 };
 
 export type CreateCreditExpenseInput = {
@@ -81,11 +83,11 @@ export type CreateCreditExpenseInput = {
   // conversion). For "subscription", the amount charged every period.
   totalAmount?: number;
   currency?: string;
-  months?: number | null; // required for "installment"; omit/null for an open-ended subscription
-  startDate: string; // ISO date, e.g. 2026-07-10
+  totalCycle?: number | null; // required for "installment"; omit/null for an open-ended subscription
+  transactionDate: string; // ISO date, e.g. 2026-07-10 — the real date of purchase
   source: "telegram" | "web";
   // Alternative to `totalAmount`: a total/per-period amount in a foreign currency,
-  // converted to VND using the historical rate on `startDate`.
+  // converted to VND using the historical rate on `transactionDate`.
   originalCurrency?: string | null;
   originalAmount?: number | null;
 };

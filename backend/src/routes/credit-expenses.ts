@@ -22,6 +22,19 @@ function addMonths(date: string, offset: number): string {
   return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
 }
 
+// Anchors a transaction date to the statement it'll actually appear on: your statement
+// closes on `closeDay` of each month, so a charge dated after that day doesn't land on
+// this month's statement — it rolls to next month's (same closeDay). On or before the
+// close day, it lands on this month's statement.
+function toStatementDate(date: string, closeDay: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const offset = day > closeDay ? 1 : 0;
+  const target = new Date(year, month - 1 + offset, 1);
+  const lastDayOfTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(closeDay, lastDayOfTargetMonth));
+  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+}
+
 // Number of whole months elapsed from `startDate` up to (and including) today's month —
 // used to backfill installments for an open-ended subscription that's already underway.
 function monthsElapsedSoFar(startDate: string): number {
@@ -44,8 +57,8 @@ creditExpensesRoute.post("/", async (c) => {
   if (billingType !== "installment" && billingType !== "subscription") {
     return c.json({ error: "billingType must be 'installment' or 'subscription'" }, 400);
   }
-  if (!body.startDate || !isValidDate(body.startDate)) {
-    return c.json({ error: "startDate must be in YYYY-MM-DD format" }, 400);
+  if (!body.transactionDate || !isValidDate(body.transactionDate)) {
+    return c.json({ error: "transactionDate must be in YYYY-MM-DD format" }, 400);
   }
   if (!body.description?.trim()) {
     return c.json({ error: "description is required" }, 400);
@@ -54,15 +67,15 @@ creditExpensesRoute.post("/", async (c) => {
     return c.json({ error: "source must be 'telegram' or 'web'" }, 400);
   }
 
-  let months: number | null = null;
-  if (body.months !== undefined && body.months !== null) {
-    if (!Number.isInteger(body.months) || body.months < 1) {
-      return c.json({ error: "months must be a positive integer" }, 400);
+  let totalCycle: number | null = null;
+  if (body.totalCycle !== undefined && body.totalCycle !== null) {
+    if (!Number.isInteger(body.totalCycle) || body.totalCycle < 1) {
+      return c.json({ error: "totalCycle must be a positive integer" }, 400);
     }
-    months = body.months;
+    totalCycle = body.totalCycle;
   }
-  if (billingType === "installment" && months === null) {
-    return c.json({ error: "months is required for an installment plan" }, 400);
+  if (billingType === "installment" && totalCycle === null) {
+    return c.json({ error: "totalCycle is required for an installment plan" }, 400);
   }
 
   const db = createDb(c.env.DB);
@@ -78,14 +91,14 @@ creditExpensesRoute.post("/", async (c) => {
     if (originalCurrency === null || originalAmount === null) {
       return c.json({ error: "either totalAmount or originalCurrency+originalAmount is required" }, 400);
     }
-    const lookup = await resolveFxRate(db, c.env.FX_API_BASE_URL, originalCurrency, body.startDate);
+    const lookup = await resolveFxRate(db, c.env.FX_API_BASE_URL, originalCurrency, body.transactionDate);
     exchangeRate = lookup.rate;
     const exponent = CURRENCY_MINOR_UNIT_EXPONENTS[originalCurrency.toUpperCase()] ?? 0;
     totalAmount = Math.round((originalAmount / 10 ** exponent) * lookup.rate);
   } else if (originalCurrency !== null && originalAmount !== null) {
     // Caller supplied both a canonical totalAmount and a reference original amount —
     // still resolve the rate so it's recorded, but don't let it override totalAmount.
-    const lookup = await resolveFxRate(db, c.env.FX_API_BASE_URL, originalCurrency, body.startDate);
+    const lookup = await resolveFxRate(db, c.env.FX_API_BASE_URL, originalCurrency, body.transactionDate);
     exchangeRate = lookup.rate;
   } else {
     originalCurrency = null;
@@ -96,7 +109,10 @@ creditExpensesRoute.post("/", async (c) => {
     return c.json({ error: "totalAmount must be a positive number" }, 400);
   }
 
-  const endDate = months !== null ? addMonths(body.startDate, months - 1) : null;
+  // `transactionDate` is stored exactly as entered — the real date of purchase, never
+  // shifted. Every generated charge is anchored to the statement it actually lands on.
+  const closeDay = Number(c.env.STATEMENT_CLOSE_DAY) || 4;
+  const statementAnchor = toStatementDate(body.transactionDate, closeDay);
 
   const [plan] = await db
     .insert(creditExpenses)
@@ -106,9 +122,8 @@ creditExpensesRoute.post("/", async (c) => {
       billingType,
       totalAmount,
       currency,
-      months,
-      startDate: body.startDate,
-      endDate,
+      totalCycle,
+      transactionDate: body.transactionDate,
       source: body.source,
       originalCurrency,
       originalAmount,
@@ -116,34 +131,30 @@ creditExpensesRoute.post("/", async (c) => {
     })
     .returning();
 
-  // "installment": split the total across `months` installments; the last one absorbs
+  // "installment": split the total across `totalCycle` charges; the last one absorbs
   // the rounding remainder so the sum always equals totalAmount exactly.
-  // "subscription": each installment is the full per-period amount, not divided.
-  const installmentCount = months ?? monthsElapsedSoFar(body.startDate);
-  const baseInstallment =
-    billingType === "installment" ? Math.floor(totalAmount / installmentCount) : totalAmount;
+  // "subscription": each charge is the full per-period amount, not divided.
+  const cycleCount = totalCycle ?? monthsElapsedSoFar(statementAnchor);
+  const baseCharge = billingType === "installment" ? Math.floor(totalAmount / cycleCount) : totalAmount;
 
-  const installments = Array.from({ length: installmentCount }, (_, i) => {
-    const isLast = i === installmentCount - 1;
+  const charges = Array.from({ length: cycleCount }, (_, i) => {
+    const isLast = i === cycleCount - 1;
     const amount =
-      billingType === "installment" && isLast
-        ? totalAmount! - baseInstallment * (installmentCount - 1)
-        : baseInstallment;
+      billingType === "installment" && isLast ? totalAmount! - baseCharge * (cycleCount - 1) : baseCharge;
 
     return {
       amount,
       currency,
-      description:
-        billingType === "installment" ? `${description} (${i + 1}/${installmentCount})` : description,
+      description: billingType === "installment" ? `${description} (${i + 1}/${cycleCount})` : description,
       categoryId: body.categoryId ?? null,
-      occurredAt: addMonths(body.startDate, i),
+      occurredAt: addMonths(statementAnchor, i),
       source: body.source,
       creditExpenseId: plan.id,
-      installmentIndex: i + 1,
+      currentCycle: i + 1,
     };
   });
 
-  await db.insert(expenses).values(installments);
+  await db.insert(expenses).values(charges);
 
   return c.json(plan, 201);
 });

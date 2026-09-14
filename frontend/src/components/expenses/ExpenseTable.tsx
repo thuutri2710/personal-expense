@@ -37,6 +37,7 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
       <TableHeader>
         <TableRow>
           <TableHead>Date</TableHead>
+          <TableHead>Transaction date</TableHead>
           <TableHead>Description</TableHead>
           <TableHead>Category</TableHead>
           <TableHead>Type</TableHead>
@@ -63,6 +64,9 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
               <TableCell className="whitespace-nowrap text-muted-foreground">
                 {formatDate(expense.occurredAt)}
               </TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">
+                {creditExpense ? formatDate(creditExpense.transactionDate) : "—"}
+              </TableCell>
               <TableCell className="font-medium">{expense.description}</TableCell>
               <TableCell>
                 {category ? (
@@ -87,10 +91,10 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
                 )}
               </TableCell>
               <TableCell className="text-right text-muted-foreground tabular-nums">
-                {isCredit ? expense.installmentIndex : "—"}
+                {isCredit ? expense.currentCycle : "—"}
               </TableCell>
               <TableCell className="text-right text-muted-foreground tabular-nums">
-                {isCredit ? (creditExpense?.months ?? "—") : "—"}
+                {isCredit ? (creditExpense?.totalCycle ?? "—") : "—"}
               </TableCell>
               <TableCell className="text-muted-foreground">{currency}</TableCell>
               <TableCell className="text-right tabular-nums">

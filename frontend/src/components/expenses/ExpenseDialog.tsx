@@ -86,8 +86,8 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
   const [quickText, setQuickText] = useState("");
   const [creditBillingType, setCreditBillingType] = useState<BillingType>("installment");
   const [creditTotalAmount, setCreditTotalAmount] = useState("");
-  const [creditMonths, setCreditMonths] = useState("");
-  const [creditStartDate, setCreditStartDate] = useState(todayIso());
+  const [creditTotalCycle, setCreditTotalCycle] = useState("");
+  const [creditTransactionDate, setCreditTransactionDate] = useState(todayIso());
   const [originalCurrency, setOriginalCurrency] = useState<string | null>(null);
   const [originalAmount, setOriginalAmount] = useState<number | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
@@ -115,8 +115,8 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
       setQuickText("");
       setCreditBillingType("installment");
       setCreditTotalAmount("");
-      setCreditMonths("");
-      setCreditStartDate(todayIso());
+      setCreditTotalCycle("");
+      setCreditTransactionDate(todayIso());
       setOriginalCurrency(null);
       setOriginalAmount(null);
       setExchangeRate(null);
@@ -155,8 +155,8 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
     if (result.kind === "credit") {
       setCreditBillingType("installment");
       setCreditTotalAmount(String(result.totalAmount));
-      setCreditMonths(String(result.months));
-      setCreditStartDate(`${result.startMonth}-01`);
+      setCreditTotalCycle(String(result.months));
+      setCreditTransactionDate(`${result.startMonth}-01`);
       setActiveTab("credit");
       toast.success(
         (result.categoryName
@@ -184,22 +184,25 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
 
     if (!isEdit && activeTab === "credit") {
       const totalAmount = Number(creditTotalAmount);
-      const monthsEntered = creditMonths.trim() ? Number(creditMonths) : null;
+      const totalCycleEntered = creditTotalCycle.trim() ? Number(creditTotalCycle) : null;
 
       if (!totalAmount || totalAmount <= 0) {
         toast.error(creditBillingType === "installment" ? "Enter a valid total amount" : "Enter a valid monthly amount");
         return;
       }
-      if (creditBillingType === "installment" && (!monthsEntered || !Number.isInteger(monthsEntered) || monthsEntered < 1)) {
-        toast.error("Enter a valid number of months");
+      if (
+        creditBillingType === "installment" &&
+        (!totalCycleEntered || !Number.isInteger(totalCycleEntered) || totalCycleEntered < 1)
+      ) {
+        toast.error("Enter a valid number of cycles");
         return;
       }
-      if (monthsEntered !== null && (!Number.isInteger(monthsEntered) || monthsEntered < 1)) {
-        toast.error("Enter a valid number of months, or leave it blank for an ongoing subscription");
+      if (totalCycleEntered !== null && (!Number.isInteger(totalCycleEntered) || totalCycleEntered < 1)) {
+        toast.error("Enter a valid number of cycles, or leave it blank for an ongoing subscription");
         return;
       }
-      if (!creditStartDate) {
-        toast.error("Pick a start date");
+      if (!creditTransactionDate) {
+        toast.error("Pick a transaction date");
         return;
       }
       if (!description.trim()) {
@@ -211,15 +214,15 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
         await createCreditExpense.mutateAsync({
           billingType: creditBillingType,
           totalAmount,
-          months: monthsEntered,
-          startDate: creditStartDate,
+          totalCycle: totalCycleEntered,
+          transactionDate: creditTransactionDate,
           description: description.trim(),
           categoryId: categoryId === UNCATEGORIZED ? null : Number(categoryId),
           source: "web",
         });
         toast.success(
           creditBillingType === "installment"
-            ? `Credit expense added — ${monthsEntered} installments created`
+            ? `Credit expense added — ${totalCycleEntered} cycles created`
             : "Subscription added",
         );
         setOpen(false);
@@ -266,10 +269,10 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
     }
   }
 
-  const creditMonthsCount = Number(creditMonths);
-  const creditMonthlyPreview =
-    creditBillingType === "installment" && creditTotalAmount && creditMonthsCount > 0
-      ? Math.round(Number(creditTotalAmount) / creditMonthsCount)
+  const creditTotalCycleCount = Number(creditTotalCycle);
+  const creditPerCyclePreview =
+    creditBillingType === "installment" && creditTotalAmount && creditTotalCycleCount > 0
+      ? Math.round(Number(creditTotalAmount) / creditTotalCycleCount)
       : null;
 
   return (
@@ -453,33 +456,37 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
                     </div>
 
                     <div className="grid gap-2">
-                      <Label htmlFor="credit-months">Months</Label>
+                      <Label htmlFor="credit-total-cycle">Total cycles</Label>
                       <Input
-                        id="credit-months"
+                        id="credit-total-cycle"
                         type="number"
                         inputMode="numeric"
                         min="1"
                         step="1"
                         placeholder={creditBillingType === "installment" ? "12" : "Leave blank if ongoing"}
-                        value={creditMonths}
-                        onChange={(e) => setCreditMonths(e.target.value)}
+                        value={creditTotalCycle}
+                        onChange={(e) => setCreditTotalCycle(e.target.value)}
                       />
                     </div>
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="credit-start-date">Start date</Label>
+                    <Label htmlFor="credit-transaction-date">Transaction date</Label>
                     <Input
-                      id="credit-start-date"
+                      id="credit-transaction-date"
                       type="date"
-                      value={creditStartDate}
-                      onChange={(e) => setCreditStartDate(e.target.value)}
+                      value={creditTransactionDate}
+                      onChange={(e) => setCreditTransactionDate(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      The date you actually made the purchase — each cycle's billing date is
+                      calculated from this automatically based on your statement's close day.
+                    </p>
                   </div>
 
-                  {creditMonthlyPreview !== null && (
+                  {creditPerCyclePreview !== null && (
                     <p className="text-xs text-muted-foreground">
-                      ≈ {formatCurrency(creditMonthlyPreview, "VND")} / month for {creditMonthsCount} months
+                      ≈ {formatCurrency(creditPerCyclePreview, "VND")} / cycle for {creditTotalCycleCount} cycles
                     </p>
                   )}
                 </div>

@@ -16,7 +16,7 @@ export type Expense = {
   source: "telegram" | "web";
   createdAt: string;
   creditExpenseId: number | null;
-  installmentIndex: number | null;
+  currentCycle: number | null; // 1-based position within the plan's totalCycle
   // Set only when `amount`/`currency` were converted from a currency the user actually
   // typed (e.g. "$20 lunch"); null when the expense was already in the default currency.
   originalCurrency: string | null;
@@ -50,13 +50,12 @@ export type CreditExpense = {
   description: string;
   categoryId: number | null;
   billingType: BillingType;
-  // "installment": total price financed, split evenly across `months`.
-  // "subscription": the amount charged every period — NOT divided by months.
+  // "installment": total price financed, split evenly across `totalCycle`.
+  // "subscription": the amount charged every period — NOT divided by totalCycle.
   totalAmount: number;
   currency: string;
-  months: number | null; // required for "installment"; null = ongoing "subscription"
-  startDate: string; // ISO date, e.g. 2026-07-10 — first charge's exact date
-  endDate: string | null; // ISO date; derived from months when known, null = ongoing
+  totalCycle: number | null; // required for "installment"; null = ongoing "subscription"
+  transactionDate: string; // ISO date, e.g. 2026-07-10 — the real date of purchase
   source: "telegram" | "web";
   createdAt: string;
   originalCurrency: string | null;
@@ -70,8 +69,8 @@ export type CreateCreditExpenseInput = {
   billingType: BillingType;
   totalAmount?: number;
   currency?: string;
-  months?: number | null;
-  startDate: string; // ISO date, e.g. 2026-07-10
+  totalCycle?: number | null;
+  transactionDate: string; // ISO date, e.g. 2026-07-10
   source: "telegram" | "web";
   originalCurrency?: string | null;
   originalAmount?: number | null;

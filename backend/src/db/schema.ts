@@ -30,16 +30,18 @@ export const creditExpenses = sqliteTable("credit_expenses", {
   categoryId: integer("category_id").references(() => categories.id, {
     onDelete: "set null",
   }),
-  // "installment": totalAmount is the total price financed, split evenly across `months`
-  // (a one-time purchase paid off over time, e.g. a phone bought on a payment plan).
-  // "subscription": totalAmount is the amount charged every period, NOT divided — `months`
-  // is only the known/expected duration (null = ongoing, no fixed end).
+  // "installment": totalAmount is the total price financed, split evenly across
+  // `totalCycle` (a one-time purchase paid off over time, e.g. a phone bought on a
+  // payment plan). "subscription": totalAmount is the amount charged every period, NOT
+  // divided — `totalCycle` is only the known/expected duration (null = ongoing).
   billingType: text("billing_type", { enum: ["installment", "subscription"] }).notNull(),
   totalAmount: integer("total_amount").notNull(),
   currency: text("currency").notNull(),
-  months: integer("months"), // required for "installment"; nullable for an open-ended "subscription"
-  startDate: text("start_date").notNull(), // ISO date, e.g. 2026-07-10 — first charge's exact date
-  endDate: text("end_date"), // ISO date; derived from months when known, null = ongoing
+  totalCycle: integer("total_cycle"), // required for "installment"; null = ongoing "subscription"
+  // ISO date, e.g. 2026-07-10 — the real date of purchase. Never shifted for billing —
+  // each generated charge's own occurredAt (see expenses.currentCycle) is what gets
+  // anchored to the statement it actually lands on.
+  transactionDate: text("transaction_date").notNull(),
   source: text("source", { enum: ["telegram", "web"] }).notNull(),
   createdAt: text("created_at")
     .notNull()
@@ -48,7 +50,7 @@ export const creditExpenses = sqliteTable("credit_expenses", {
   // quoted (e.g. a USD subscription price); null when already in the default currency.
   originalCurrency: text("original_currency"),
   originalAmount: integer("original_amount"), // minor units of originalCurrency
-  exchangeRate: real("exchange_rate"), // 1 unit of originalCurrency = exchangeRate VND, at startDate
+  exchangeRate: real("exchange_rate"), // 1 unit of originalCurrency = exchangeRate VND, at transactionDate
 });
 
 export const expenses = sqliteTable("expenses", {
@@ -69,7 +71,7 @@ export const expenses = sqliteTable("expenses", {
   creditExpenseId: integer("credit_expense_id").references(() => creditExpenses.id, {
     onDelete: "cascade",
   }),
-  installmentIndex: integer("installment_index"), // 1-based position within the plan's months
+  currentCycle: integer("current_cycle"), // 1-based position within the plan's totalCycle
   // Set only when `amount`/`currency` above were converted from a non-default currency the
   // user typed (e.g. "$20 lunch"). Null when the expense was already in the default currency.
   originalCurrency: text("original_currency"),
