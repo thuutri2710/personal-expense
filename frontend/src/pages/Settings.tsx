@@ -167,14 +167,17 @@ export function Settings() {
               )}
               {creditExpenses.map((ce) => {
                 const category = ce.categoryId ? categoryById.get(ce.categoryId) : null;
-                const monthly = Math.round(ce.totalAmount / ce.months);
+                const isInstallment = ce.billingType === "installment";
+                const monthly = isInstallment && ce.months ? Math.round(ce.totalAmount / ce.months) : ce.totalAmount;
                 return (
                   <div key={ce.id} className="flex items-center justify-between gap-4 px-4 py-2.5">
                     <div>
                       <p className="text-sm font-medium">{ce.description}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatCurrency(ce.totalAmount, ce.currency)} over {ce.months} months (
-                        {formatCurrency(monthly, ce.currency)}/mo) starting {ce.startMonth}
+                        {isInstallment
+                          ? `${formatCurrency(ce.totalAmount, ce.currency)} over ${ce.months} months (${formatCurrency(monthly, ce.currency)}/mo)`
+                          : `${formatCurrency(monthly, ce.currency)}/mo${ce.months ? ` for ${ce.months} months` : " (ongoing)"}`}{" "}
+                        starting {ce.startDate}
                         {category ? ` · ${category.icon ? `${category.icon} ` : ""}${category.name}` : ""}
                       </p>
                     </div>

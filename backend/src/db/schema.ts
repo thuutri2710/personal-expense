@@ -30,15 +30,25 @@ export const creditExpenses = sqliteTable("credit_expenses", {
   categoryId: integer("category_id").references(() => categories.id, {
     onDelete: "set null",
   }),
-  // total amount owed across the whole installment plan, same minor-unit convention as expenses.amount
+  // "installment": totalAmount is the total price financed, split evenly across `months`
+  // (a one-time purchase paid off over time, e.g. a phone bought on a payment plan).
+  // "subscription": totalAmount is the amount charged every period, NOT divided — `months`
+  // is only the known/expected duration (null = ongoing, no fixed end).
+  billingType: text("billing_type", { enum: ["installment", "subscription"] }).notNull(),
   totalAmount: integer("total_amount").notNull(),
   currency: text("currency").notNull(),
-  months: integer("months").notNull(),
-  startMonth: text("start_month").notNull(), // YYYY-MM, first installment's month
+  months: integer("months"), // required for "installment"; nullable for an open-ended "subscription"
+  startDate: text("start_date").notNull(), // ISO date, e.g. 2026-07-10 — first charge's exact date
+  endDate: text("end_date"), // ISO date; derived from months when known, null = ongoing
   source: text("source", { enum: ["telegram", "web"] }).notNull(),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(current_timestamp)`),
+  // Set only when totalAmount/currency were converted from a currency the user actually
+  // quoted (e.g. a USD subscription price); null when already in the default currency.
+  originalCurrency: text("original_currency"),
+  originalAmount: integer("original_amount"), // minor units of originalCurrency
+  exchangeRate: real("exchange_rate"), // 1 unit of originalCurrency = exchangeRate VND, at startDate
 });
 
 export const expenses = sqliteTable("expenses", {

@@ -77,7 +77,9 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
                   <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
                     <Repeat className="h-3 w-3" />
                     Credit
-                    {creditExpense ? ` ${expense.installmentIndex}/${creditExpense.months}` : ""}
+                    {creditExpense
+                      ? ` ${expense.installmentIndex}${creditExpense.months ? `/${creditExpense.months}` : ""}`
+                      : ""}
                   </Badge>
                 ) : (
                   <Badge variant="secondary" className="font-normal">

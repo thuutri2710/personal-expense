@@ -50,26 +50,44 @@ export type UpdateExpenseInput = Partial<
   Omit<CreateExpenseInput, "source">
 >;
 
+export type BillingType = "installment" | "subscription";
+
 export type CreditExpense = {
   id: number;
   description: string;
   categoryId: number | null;
+  billingType: BillingType;
+  // "installment": total price financed, split evenly across `months`.
+  // "subscription": the amount charged every period — NOT divided by months.
   totalAmount: number;
   currency: string;
-  months: number;
-  startMonth: string; // YYYY-MM
+  months: number | null; // required for "installment"; null = ongoing "subscription"
+  startDate: string; // ISO date, e.g. 2026-07-10 — first charge's exact date
+  endDate: string | null; // ISO date; derived from months when known, null = ongoing
   source: "telegram" | "web";
   createdAt: string;
+  // Set only when totalAmount/currency were converted from a currency the user actually
+  // quoted (e.g. a USD subscription price); null when already in the default currency.
+  originalCurrency: string | null;
+  originalAmount: number | null; // minor units of originalCurrency
+  exchangeRate: number | null; // 1 unit of originalCurrency = exchangeRate VND, at startDate
 };
 
 export type CreateCreditExpenseInput = {
   description: string;
   categoryId?: number | null;
-  totalAmount: number;
+  billingType: BillingType;
+  // For "installment", the total price (required, unless originalAmount is given for
+  // conversion). For "subscription", the amount charged every period.
+  totalAmount?: number;
   currency?: string;
-  months: number;
-  startMonth: string; // YYYY-MM
+  months?: number | null; // required for "installment"; omit/null for an open-ended subscription
+  startDate: string; // ISO date, e.g. 2026-07-10
   source: "telegram" | "web";
+  // Alternative to `totalAmount`: a total/per-period amount in a foreign currency,
+  // converted to VND using the historical rate on `startDate`.
+  originalCurrency?: string | null;
+  originalAmount?: number | null;
 };
 
 export type RawMessage = {

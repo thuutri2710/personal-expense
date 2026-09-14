@@ -27,8 +27,8 @@ import {
   useParseExpenseText,
   useUpdateExpense,
 } from "@/hooks/useExpenses";
-import { currentMonthIso, formatCurrency, formatExchangeRate, formatOriginalAmount, todayIso } from "@/lib/format";
-import type { Category, CreditExpenseMissingField, Expense } from "@/types";
+import { formatCurrency, formatExchangeRate, formatOriginalAmount, todayIso } from "@/lib/format";
+import type { BillingType, Category, CreditExpenseMissingField, Expense } from "@/types";
 
 type ExpenseDialogProps = {
   trigger: ReactElement;
@@ -42,6 +42,11 @@ const MISSING_FIELD_LABELS: Record<CreditExpenseMissingField, string> = {
   months: "number of months",
   startMonth: "start month",
 };
+
+const BILLING_TYPE_ITEMS: Array<{ value: BillingType; label: string }> = [
+  { value: "installment", label: "Installment (financed purchase)" },
+  { value: "subscription", label: "Subscription (recurring charge)" },
+];
 
 type CategoryFieldProps = {
   id: string;
@@ -79,9 +84,10 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
   const [occurredAt, setOccurredAt] = useState(todayIso());
   const [activeTab, setActiveTab] = useState("manual");
   const [quickText, setQuickText] = useState("");
+  const [creditBillingType, setCreditBillingType] = useState<BillingType>("installment");
   const [creditTotalAmount, setCreditTotalAmount] = useState("");
   const [creditMonths, setCreditMonths] = useState("");
-  const [creditStartMonth, setCreditStartMonth] = useState(currentMonthIso());
+  const [creditStartDate, setCreditStartDate] = useState(todayIso());
   const [originalCurrency, setOriginalCurrency] = useState<string | null>(null);
   const [originalAmount, setOriginalAmount] = useState<number | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
@@ -107,9 +113,10 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
       setOccurredAt(expense?.occurredAt ?? todayIso());
       setActiveTab("manual");
       setQuickText("");
+      setCreditBillingType("installment");
       setCreditTotalAmount("");
       setCreditMonths("");
-      setCreditStartMonth(currentMonthIso());
+      setCreditStartDate(todayIso());
       setOriginalCurrency(null);
       setOriginalAmount(null);
       setExchangeRate(null);
@@ -146,9 +153,10 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
       rest.length > 0 ? ` (found ${rest.length} more — add ${rest.length === 1 ? "it" : "them"} separately)` : "";
 
     if (result.kind === "credit") {
+      setCreditBillingType("installment");
       setCreditTotalAmount(String(result.totalAmount));
       setCreditMonths(String(result.months));
-      setCreditStartMonth(result.startMonth);
+      setCreditStartDate(`${result.startMonth}-01`);
       setActiveTab("credit");
       toast.success(
         (result.categoryName
@@ -176,18 +184,22 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
 
     if (!isEdit && activeTab === "credit") {
       const totalAmount = Number(creditTotalAmount);
-      const months = Number(creditMonths);
+      const monthsEntered = creditMonths.trim() ? Number(creditMonths) : null;
 
       if (!totalAmount || totalAmount <= 0) {
-        toast.error("Enter a valid total amount");
+        toast.error(creditBillingType === "installment" ? "Enter a valid total amount" : "Enter a valid monthly amount");
         return;
       }
-      if (!Number.isInteger(months) || months < 1) {
+      if (creditBillingType === "installment" && (!monthsEntered || !Number.isInteger(monthsEntered) || monthsEntered < 1)) {
         toast.error("Enter a valid number of months");
         return;
       }
-      if (!creditStartMonth) {
-        toast.error("Pick a start month");
+      if (monthsEntered !== null && (!Number.isInteger(monthsEntered) || monthsEntered < 1)) {
+        toast.error("Enter a valid number of months, or leave it blank for an ongoing subscription");
+        return;
+      }
+      if (!creditStartDate) {
+        toast.error("Pick a start date");
         return;
       }
       if (!description.trim()) {
@@ -197,14 +209,19 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
 
       try {
         await createCreditExpense.mutateAsync({
+          billingType: creditBillingType,
           totalAmount,
-          months,
-          startMonth: creditStartMonth,
+          months: monthsEntered,
+          startDate: creditStartDate,
           description: description.trim(),
           categoryId: categoryId === UNCATEGORIZED ? null : Number(categoryId),
           source: "web",
         });
-        toast.success(`Credit expense added — ${months} installments created`);
+        toast.success(
+          creditBillingType === "installment"
+            ? `Credit expense added — ${monthsEntered} installments created`
+            : "Subscription added",
+        );
         setOpen(false);
       } catch {
         toast.error("Something went wrong. Please try again.");
@@ -251,7 +268,7 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
 
   const creditMonthsCount = Number(creditMonths);
   const creditMonthlyPreview =
-    creditTotalAmount && creditMonthsCount > 0
+    creditBillingType === "installment" && creditTotalAmount && creditMonthsCount > 0
       ? Math.round(Number(creditTotalAmount) / creditMonthsCount)
       : null;
 
@@ -373,7 +390,34 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
               <TabsContent value="credit">
                 <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="credit-amount">Total amount</Label>
+                    <Label htmlFor="credit-billing-type">Billing type</Label>
+                    <Select
+                      items={BILLING_TYPE_ITEMS}
+                      value={creditBillingType}
+                      onValueChange={(v) => setCreditBillingType((v as BillingType) ?? "installment")}
+                    >
+                      <SelectTrigger id="credit-billing-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BILLING_TYPE_ITEMS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {creditBillingType === "installment"
+                        ? "A one-time purchase paid off over a fixed number of months."
+                        : "A recurring charge — enter the amount charged each month."}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="credit-amount">
+                      {creditBillingType === "installment" ? "Total amount" : "Amount per month"}
+                    </Label>
                     <Input
                       id="credit-amount"
                       type="number"
@@ -416,7 +460,7 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
                         inputMode="numeric"
                         min="1"
                         step="1"
-                        placeholder="12"
+                        placeholder={creditBillingType === "installment" ? "12" : "Leave blank if ongoing"}
                         value={creditMonths}
                         onChange={(e) => setCreditMonths(e.target.value)}
                       />
@@ -424,12 +468,12 @@ export function ExpenseDialog({ trigger, expense }: ExpenseDialogProps) {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="credit-start-month">Start month</Label>
+                    <Label htmlFor="credit-start-date">Start date</Label>
                     <Input
-                      id="credit-start-month"
-                      type="month"
-                      value={creditStartMonth}
-                      onChange={(e) => setCreditStartMonth(e.target.value)}
+                      id="credit-start-date"
+                      type="date"
+                      value={creditStartDate}
+                      onChange={(e) => setCreditStartDate(e.target.value)}
                     />
                   </div>
 

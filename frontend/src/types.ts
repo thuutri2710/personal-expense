@@ -43,26 +43,38 @@ export type CreateCategoryInput = {
   icon?: string | null;
 };
 
+export type BillingType = "installment" | "subscription";
+
 export type CreditExpense = {
   id: number;
   description: string;
   categoryId: number | null;
+  billingType: BillingType;
+  // "installment": total price financed, split evenly across `months`.
+  // "subscription": the amount charged every period — NOT divided by months.
   totalAmount: number;
   currency: string;
-  months: number;
-  startMonth: string; // YYYY-MM
+  months: number | null; // required for "installment"; null = ongoing "subscription"
+  startDate: string; // ISO date, e.g. 2026-07-10 — first charge's exact date
+  endDate: string | null; // ISO date; derived from months when known, null = ongoing
   source: "telegram" | "web";
   createdAt: string;
+  originalCurrency: string | null;
+  originalAmount: number | null;
+  exchangeRate: number | null;
 };
 
 export type CreateCreditExpenseInput = {
   description: string;
   categoryId?: number | null;
-  totalAmount: number;
+  billingType: BillingType;
+  totalAmount?: number;
   currency?: string;
-  months: number;
-  startMonth: string; // YYYY-MM
+  months?: number | null;
+  startDate: string; // ISO date, e.g. 2026-07-10
   source: "telegram" | "web";
+  originalCurrency?: string | null;
+  originalAmount?: number | null;
 };
 
 export type CreditExpenseMissingField = "amount" | "months" | "startMonth";
