@@ -1,38 +1,47 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ExpenseFilterBar } from "@/components/expenses/ExpenseFilterBar";
 import { ExpenseTable } from "@/components/expenses/ExpenseTable";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreditExpenses } from "@/hooks/useCreditExpenses";
 import { useExpenses } from "@/hooks/useExpenses";
+import { applyExpenseFilters, type ExpenseFilterParams } from "@/lib/expense-filters";
 import { formatCurrency } from "@/lib/format";
-
-const ALL_CATEGORIES = "all";
 
 export function Expenses() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [categoryId, setCategoryId] = useState(ALL_CATEGORIES);
+  const [filters, setFilters] = useState<ExpenseFilterParams>({});
 
   const { data: categories = [] } = useCategories();
   const { data: creditExpenses = [] } = useCreditExpenses();
+  // Only the date range narrows the backend query — category/type/currency are applied
+  // client-side below (see lib/expense-filters.ts) so tweaking them never refetches.
   const { data: expenses = [], isLoading } = useExpenses({
     from: from || undefined,
     to: to || undefined,
-    categoryId: categoryId === ALL_CATEGORIES ? undefined : Number(categoryId),
   });
 
-  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const currency = expenses[0]?.currency ?? "VND";
+  const creditExpenseById = useMemo(
+    () => new Map(creditExpenses.map((ce) => [ce.id, ce])),
+    [creditExpenses],
+  );
+
+  const currencies = useMemo(
+    () => Array.from(new Set(expenses.map((e) => e.originalCurrency ?? e.currency))).sort(),
+    [expenses],
+  );
+
+  const filteredExpenses = useMemo(
+    () => applyExpenseFilters(expenses, creditExpenseById, filters),
+    [expenses, creditExpenseById, filters],
+  );
+
+  const total = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const currency = filteredExpenses[0]?.currency ?? "VND";
 
   return (
     <div>
@@ -52,36 +61,25 @@ export function Expenses() {
             <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs text-muted-foreground">Category</Label>
-            <Select
-              value={categoryId}
-              onValueChange={(value) => setCategoryId(value ?? ALL_CATEGORIES)}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_CATEGORIES}>All categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.icon ? `${c.icon} ` : ""}
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-xs text-muted-foreground">&nbsp;</Label>
+            <ExpenseFilterBar
+              categories={categories}
+              currencies={currencies}
+              value={filters}
+              onChange={setFilters}
+            />
           </div>
 
-          {!isLoading && expenses.length > 0 && (
+          {!isLoading && filteredExpenses.length > 0 && (
             <p className="ml-auto text-sm text-muted-foreground">
-              {expenses.length} expenses · {formatCurrency(total, currency)}
+              {filteredExpenses.length} expenses · {formatCurrency(total, currency)}
             </p>
           )}
         </div>
 
         <Card>
           <CardContent className="px-0">
-            <ExpenseTable expenses={expenses} categories={categories} creditExpenses={creditExpenses} />
+            <ExpenseTable expenses={filteredExpenses} categories={categories} creditExpenses={creditExpenses} />
           </CardContent>
         </Card>
       </div>
