@@ -60,15 +60,6 @@ export function Expenses() {
             </Label>
             <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
           </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs text-muted-foreground">&nbsp;</Label>
-            <ExpenseFilterBar
-              categories={categories}
-              currencies={currencies}
-              value={filters}
-              onChange={setFilters}
-            />
-          </div>
 
           {!isLoading && filteredExpenses.length > 0 && (
             <p className="ml-auto text-sm text-muted-foreground">
@@ -76,6 +67,8 @@ export function Expenses() {
             </p>
           )}
         </div>
+
+        <ExpenseFilterBar categories={categories} currencies={currencies} value={filters} onChange={setFilters} />
 
         <Card>
           <CardContent className="px-0">

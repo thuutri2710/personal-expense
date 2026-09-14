@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryBreakdownChart } from "@/components/charts/CategoryBreakdownChart";
+import { ExpenseFilterBar } from "@/components/expenses/ExpenseFilterBar";
 import { ExpenseTable } from "@/components/expenses/ExpenseTable";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreditExpenses } from "@/hooks/useCreditExpenses";
 import { useExpenses } from "@/hooks/useExpenses";
+import { applyExpenseFilters, type ExpenseFilterParams } from "@/lib/expense-filters";
 import { formatCurrency } from "@/lib/format";
 import {
   formatPeriodLabel,
@@ -28,19 +30,37 @@ const PERIOD_TABS: { value: PeriodType; label: string }[] = [
 export function History() {
   const [period, setPeriod] = useState<PeriodType>("month");
   const [anchor, setAnchor] = useState(() => new Date());
+  const [filters, setFilters] = useState<ExpenseFilterParams>({});
 
   const { from, to } = getPeriodRange(period, anchor);
   const { data: categories = [] } = useCategories();
   const { data: creditExpenses = [] } = useCreditExpenses();
+  // The date range (period tabs) narrows the backend query — category/type/currency
+  // are applied client-side below (see lib/expense-filters.ts) so they never refetch.
   const { data: expenses = [], isLoading } = useExpenses({ from, to, limit: 1000 });
 
-  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const currency = expenses[0]?.currency ?? "VND";
+  const creditExpenseById = useMemo(
+    () => new Map(creditExpenses.map((ce) => [ce.id, ce])),
+    [creditExpenses],
+  );
+
+  const currencies = useMemo(
+    () => Array.from(new Set(expenses.map((e) => e.originalCurrency ?? e.currency))).sort(),
+    [expenses],
+  );
+
+  const filteredExpenses = useMemo(
+    () => applyExpenseFilters(expenses, creditExpenseById, filters),
+    [expenses, creditExpenseById, filters],
+  );
+
+  const total = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const currency = filteredExpenses[0]?.currency ?? "VND";
 
   const byCategory = useMemo(() => {
     const categoryById = new Map(categories.map((c) => [c.id, c]));
     const totals = new Map<number | null, number>();
-    for (const e of expenses) {
+    for (const e of filteredExpenses) {
       totals.set(e.categoryId, (totals.get(e.categoryId) ?? 0) + e.amount);
     }
     return Array.from(totals.entries()).map(([categoryId, categoryTotal]) => ({
@@ -48,7 +68,7 @@ export function History() {
       categoryName: categoryId ? (categoryById.get(categoryId)?.name ?? "Uncategorized") : "Uncategorized",
       total: categoryTotal,
     }));
-  }, [expenses, categories]);
+  }, [filteredExpenses, categories]);
 
   function handlePeriodChange(value: unknown) {
     setPeriod((value as PeriodType) ?? "month");
@@ -102,6 +122,8 @@ export function History() {
           </Button>
         </div>
 
+        <ExpenseFilterBar categories={categories} currencies={currencies} value={filters} onChange={setFilters} />
+
         <Card>
           <CardHeader className="pb-1">
             <p className="text-sm text-muted-foreground">Total spent</p>
@@ -113,7 +135,7 @@ export function History() {
               </span>
               {!isLoading && (
                 <span className="text-sm text-muted-foreground">
-                  {expenses.length} expense{expenses.length === 1 ? "" : "s"}
+                  {filteredExpenses.length} expense{filteredExpenses.length === 1 ? "" : "s"}
                 </span>
               )}
             </div>
@@ -134,7 +156,7 @@ export function History() {
             <CardTitle className="text-base">Expenses</CardTitle>
           </CardHeader>
           <CardContent className="px-0">
-            <ExpenseTable expenses={expenses} categories={categories} creditExpenses={creditExpenses} />
+            <ExpenseTable expenses={filteredExpenses} categories={categories} creditExpenses={creditExpenses} />
           </CardContent>
         </Card>
       </div>
