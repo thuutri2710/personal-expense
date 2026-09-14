@@ -40,6 +40,8 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
           <TableHead>Description</TableHead>
           <TableHead>Category</TableHead>
           <TableHead>Type</TableHead>
+          <TableHead className="text-right">Cycle #</TableHead>
+          <TableHead className="text-right">Total cycles</TableHead>
           <TableHead>Currency</TableHead>
           <TableHead className="text-right">Original amount</TableHead>
           <TableHead className="text-right">Amount (VND)</TableHead>
@@ -76,16 +78,19 @@ export function ExpenseTable({ expenses, categories, creditExpenses = [] }: Expe
                 {isCredit ? (
                   <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
                     <Repeat className="h-3 w-3" />
-                    Credit
-                    {creditExpense
-                      ? ` ${expense.installmentIndex}${creditExpense.months ? `/${creditExpense.months}` : ""}`
-                      : ""}
+                    {creditExpense?.billingType === "subscription" ? "Subscription" : "Installment"}
                   </Badge>
                 ) : (
                   <Badge variant="secondary" className="font-normal">
                     Cash
                   </Badge>
                 )}
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground tabular-nums">
+                {isCredit ? expense.installmentIndex : "—"}
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground tabular-nums">
+                {isCredit ? (creditExpense?.months ?? "—") : "—"}
               </TableCell>
               <TableCell className="text-muted-foreground">{currency}</TableCell>
               <TableCell className="text-right tabular-nums">
